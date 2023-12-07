@@ -1,0 +1,4 @@
+/.idea
+/app/logs
+/env/logs
+/env/.env
