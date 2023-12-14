@@ -1,6 +1,8 @@
 package node
 
 import (
+	"dq/linkedlist"
+	"dq/trie"
 	"dq/utils"
 	"log"
 	"sync"
@@ -11,13 +13,13 @@ const taskIdLength = 8
 
 type Queue struct {
 	mu            sync.Mutex
-	tasks         *LinkedTasks
-	reservedTasks *PTMap
+	tasks         *linkedlist.List
+	reservedTasks *trie.Trie
 }
 
 func (q *Queue) Init() {
-	q.tasks = &LinkedTasks{}
-	q.reservedTasks = &PTMap{}
+	q.tasks = &linkedlist.List{}
+	q.reservedTasks = &trie.Trie{}
 }
 
 func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
@@ -34,9 +36,9 @@ func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
 
 	q.mu.Lock()
 	if q.tasks == nil {
-		q.tasks = &LinkedTasks{}
+		q.tasks = &linkedlist.List{}
 	}
-	q.tasks.Append(&Task{Id: taskId, Body: taskBody, DelayedTime: delayedTime})
+	q.tasks.Push(&Task{Id: taskId, Body: taskBody, DelayedTime: delayedTime})
 	defer q.mu.Unlock()
 
 	return taskId, nil
@@ -46,23 +48,24 @@ func (q *Queue) Reserve() *Task {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	var lastTaskNode *TaskNode
+	var lastNode *linkedlist.Node
 
 	for {
 		// FIFO очередь тасков
-		taskNode := q.tasks.Next(lastTaskNode)
-		if taskNode == nil {
+		node := q.tasks.Next(lastNode)
+		if node == nil {
 			break
 		}
 
-		if taskNode.Task.DelayedTime.Before(time.Now()) {
-			task := taskNode.Task
+		task := node.Value.(*Task)
+
+		if task.DelayedTime.Before(time.Now()) {
 			q.reservedTasks.Put([]rune(task.Id), task)
-			q.tasks.Pull(taskNode)
+			q.tasks.Delete(node)
 
 			return task
 		}
-		lastTaskNode = taskNode
+		lastNode = node
 	}
 
 	return nil
@@ -72,19 +75,19 @@ func (q *Queue) Return(taskId string, delayMs uint32) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	rawValue := q.reservedTasks.Get([]rune(taskId))
-	if rawValue == nil {
+	trieNode := q.reservedTasks.Get([]rune(taskId))
+	if trieNode == nil {
 		return false
 	}
 
-	task := rawValue.(*Task)
+	task := trieNode.Value.(*Task)
 
 	task.DelayedTime = time.Now()
 	if delayMs > 0 {
 		task.DelayedTime = task.DelayedTime.Add(time.Duration(delayMs) * time.Millisecond)
 	}
 
-	q.tasks.Append(task)
+	q.tasks.Push(task)
 
 	q.reservedTasks.Delete([]rune(task.Id))
 
@@ -102,7 +105,7 @@ func (q *Queue) TasksLength() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	return q.tasks.Length()
+	return int(q.tasks.Length())
 }
 
 func (q *Queue) ReservedTasksLength() int {
