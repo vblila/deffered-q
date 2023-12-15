@@ -1,6 +1,7 @@
 package tcp
 
 import (
+	"bufio"
 	"dq/config"
 	"dq/node"
 	"dq/utils"
@@ -84,29 +85,19 @@ func (s *Server) handleConnection(c *Connection) {
 			conn.SetReadDeadline(time.Now().Add(time.Duration(config.InactiveConnectionTimeSec()) * time.Second))
 		}
 
-		lineBuffer := make([]byte, 0)
-		for {
-			// Читаем посимвольно, пока не дойдем до перевода строки
-			symbolBuffer := make([]byte, 1)
-			_, err := conn.Read(symbolBuffer)
-			if err != nil {
-				if err == io.EOF {
-					if config.ProfilerEnabled() {
-						log.Printf("Disconnection %s\n", conn.RemoteAddr().String())
-					}
-				} else {
-					log.Println("Error read buffer", err.Error())
+		reader := bufio.NewReader(conn)
+		lineBuffer, _, err := reader.ReadLine()
+		if err != nil {
+			if err == io.EOF {
+				if config.ProfilerEnabled() {
+					log.Printf("Disconnection %s\n", conn.RemoteAddr().String())
 				}
-
-				s.closeConnection(c.Id)
-				return
+			} else {
+				log.Println("Error read buffer", err.Error())
 			}
 
-			if string(symbolBuffer[0]) == "\n" {
-				break
-			}
-
-			lineBuffer = append(lineBuffer, symbolBuffer...)
+			s.closeConnection(c.Id)
+			return
 		}
 
 		command, err := s.Parser.ParseCommand(lineBuffer)
