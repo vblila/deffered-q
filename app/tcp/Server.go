@@ -181,6 +181,9 @@ func (s *Server) handleConnection(c *Connection) {
 			}
 
 			conn.Write([]byte(fmt.Sprintf("ok\n")))
+			if config.ProfilerEnabled() {
+				log.Printf("Task returned, tasks %d, reserved %d, heap %.2fmb\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), utils.HeapAllocMb())
+			}
 			continue
 		}
 
