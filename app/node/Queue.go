@@ -71,20 +71,24 @@ func (q *Queue) Reserve() *Task {
 	return nil
 }
 
-func (q *Queue) Return(taskId string, delayMs uint32) bool {
+func (q *Queue) Return(taskId string, delayMs uint32, isStuckAttempt bool) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	trieNode := q.reservedTasks.Get([]rune(taskId))
-	if trieNode == nil {
+	rawValue := q.reservedTasks.Get([]rune(taskId))
+	if rawValue == nil {
 		return false
 	}
 
-	task := trieNode.Value.(*Task)
+	task := rawValue.(*Task)
 
 	task.DelayedTime = time.Now()
 	if delayMs > 0 {
 		task.DelayedTime = task.DelayedTime.Add(time.Duration(delayMs) * time.Millisecond)
+	}
+
+	if isStuckAttempt {
+		task.StuckAttempts++
 	}
 
 	q.tasks.Push(task)

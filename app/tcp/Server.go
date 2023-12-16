@@ -19,6 +19,7 @@ type Server struct {
 	Connections map[string]*Connection
 	Queue       *node.Queue
 	Parser      *Parser
+	Watcher     *node.Watcher
 }
 
 func (s *Server) Init() {
@@ -136,6 +137,10 @@ func (s *Server) handleConnection(c *Connection) {
 				continue
 			}
 
+			if config.ReservedTaskStuckTimeSec() > 0 {
+				s.Watcher.WatchFor(task.Id, task.StuckAttempts)
+			}
+
 			conn.Write([]byte(fmt.Sprintf("TASK %s BODY %s\n", task.Id, task.Body)))
 			if config.ProfilerEnabled() {
 				log.Printf("Task reserved, tasks %d, reserved %d, heap %.2fmb\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), utils.HeapAllocMb())
@@ -175,7 +180,7 @@ func (s *Server) handleConnection(c *Connection) {
 				continue
 			}
 
-			if !s.Queue.Return(taskId, delayMs) {
+			if !s.Queue.Return(taskId, delayMs, false) {
 				conn.Write([]byte("unknown TASK_ID\n"))
 				continue
 			}
@@ -188,7 +193,7 @@ func (s *Server) handleConnection(c *Connection) {
 		}
 
 		if command == commandSTATS {
-			conn.Write([]byte(fmt.Sprintf("TASKS %d RESERVED %d CONNECTIONS %d HEAP %.2fmb\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), len(s.Connections), utils.HeapAllocMb())))
+			conn.Write([]byte(fmt.Sprintf("TASKS %d RESERVED %d CONNECTIONS %d HEAP %.2fm\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), len(s.Connections), utils.HeapAllocMb())))
 			continue
 		}
 

@@ -11,7 +11,7 @@ func (t *Trie) Length() uint32 {
 	return t.length
 }
 
-func (t *Trie) Get(key []rune) *Node {
+func (t *Trie) Get(key []rune) interface{} {
 	levelNode := t.rootNode
 	if levelNode == nil {
 		return nil
@@ -22,26 +22,30 @@ func (t *Trie) Get(key []rune) *Node {
 			return nil
 		}
 
-		var lastListNode *linkedlist.Node
+		isRuneNodeFound := false
 
+		var currListNode *linkedlist.Node
 		for {
-			listNode := levelNode.nodes.Next(lastListNode)
-			if listNode == nil {
+			currListNode = levelNode.nodes.Next(currListNode)
+			if currListNode == nil {
 				break
 			}
 
-			trieNode := listNode.Value.(*Node)
+			trieNode := currListNode.Value.(*Node)
 
-			if trieNode.key == k {
+			if trieNode.nodeKey == k {
 				if i == len(key)-1 {
-					return trieNode
+					return trieNode.Value
 				} else {
+					isRuneNodeFound = true
 					levelNode = trieNode
 					break
 				}
 			}
+		}
 
-			lastListNode = listNode
+		if isRuneNodeFound == false {
+			break
 		}
 	}
 
@@ -53,51 +57,52 @@ func (t *Trie) Put(key []rune, value interface{}) {
 		t.rootNode = &Node{nodes: &linkedlist.List{}}
 	}
 
-	levelNode := t.rootNode
+	runeNode := t.rootNode
+
+	var currRuneNode *Node
 
 	for i, k := range key {
-		var nextLevelNode *Node
+		currRuneNode = nil
 
-		var lastListNode *linkedlist.Node
+		var currListNode *linkedlist.Node
 		for {
-			listNode := levelNode.nodes.Next(lastListNode)
-			if listNode == nil {
+			currListNode = runeNode.nodes.Next(currListNode)
+			if currListNode == nil {
 				break
 			}
 
-			trieNode := listNode.Value.(*Node)
+			trieNode := currListNode.Value.(*Node)
 
-			if trieNode.key == k {
-				if i == len(key)-1 {
-					trieNode.Value = value
-					return
-				}
-
-				nextLevelNode = trieNode
+			if trieNode.nodeKey == k {
+				currRuneNode = trieNode
 				break
 			}
-
-			lastListNode = listNode
 		}
 
-		if nextLevelNode != nil {
-			levelNode = nextLevelNode
-		} else {
-			nextLevelNode = &Node{key: k, Value: nil, nodes: &linkedlist.List{}}
-			levelNode.nodes.Push(nextLevelNode)
-
-			if i == len(key)-1 {
-				t.length++
-				nextLevelNode.Value = value
-				return
-			}
-
-			levelNode = nextLevelNode
+		if currRuneNode == nil {
+			currRuneNode = &Node{nodeKey: k, Value: nil, nodes: &linkedlist.List{}}
+			runeNode.nodes.Push(currRuneNode)
 		}
+
+		if i == len(key)-1 {
+			t.length++
+			currRuneNode.Value = value
+			return
+		}
+
+		runeNode = currRuneNode
 	}
 }
 
 func (t *Trie) Delete(key []rune) bool {
+	return t.deleteNode(key, false)
+}
+
+func (t *Trie) deleteNode(key []rune, onlyEmptyNode bool) bool {
+	if len(key) == 0 {
+		return false
+	}
+
 	levelNode := t.rootNode
 	if levelNode == nil {
 		return false
@@ -108,27 +113,49 @@ func (t *Trie) Delete(key []rune) bool {
 			return false
 		}
 
-		var lastListNode *linkedlist.Node
+		isRuneNodeFound := false
+
+		var currListNode *linkedlist.Node
 		for {
-			listNode := levelNode.nodes.Next(lastListNode)
-			if listNode == nil {
+			currListNode = levelNode.nodes.Next(currListNode)
+			if currListNode == nil {
 				break
 			}
 
-			trieNode := listNode.Value.(*Node)
+			trieNode := currListNode.Value.(*Node)
 
-			if trieNode.key == k {
+			if trieNode.nodeKey == k {
 				if i == len(key)-1 {
-					levelNode.nodes.Delete(listNode)
-					t.length--
-					return true
+					if onlyEmptyNode == false {
+						trieNode.Value = nil
+
+						if trieNode.nodes.Length() == 0 {
+							levelNode.nodes.Delete(currListNode)
+						}
+
+						t.length--
+
+						t.deleteNode(key[:len(key)-1], true)
+
+						return true
+					} else {
+						if trieNode.Value == nil && trieNode.nodes.Length() == 0 {
+							levelNode.nodes.Delete(currListNode)
+							t.deleteNode(key[:len(key)-1], true)
+						}
+
+						return false
+					}
 				} else {
 					levelNode = trieNode
+					isRuneNodeFound = true
 					break
 				}
 			}
+		}
 
-			lastListNode = listNode
+		if isRuneNodeFound == false {
+			break
 		}
 	}
 

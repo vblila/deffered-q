@@ -35,24 +35,22 @@ func (l *List) Next(curr *Node) *Node {
 func (l *List) Delete(node *Node) {
 	if node == l.head {
 		l.head = node.next
-		if l.head != nil {
-			l.head.prev = nil
-		}
 	}
+
 	if node == l.tail {
 		l.tail = node.prev
-		if l.tail != nil {
-			l.tail.next = nil
-		}
 	}
 
 	if node.prev != nil {
 		node.prev.next = node.next
-		node.next.prev = node.prev
-
-		node.prev = nil
-		node.next = nil
 	}
+
+	if node.next != nil {
+		node.next.prev = node.prev
+	}
+
+	node.prev = nil
+	node.next = nil
 
 	l.length--
 }

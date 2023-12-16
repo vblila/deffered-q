@@ -25,7 +25,7 @@ func main() {
 	queue.Init()
 
 	// 3. TCP Server init
-	tcpServer := &tcp.Server{Parser: &tcp.Parser{}, Queue: queue}
+	tcpServer := &tcp.Server{Parser: &tcp.Parser{}, Queue: queue, Watcher: &node.Watcher{Queue: queue}}
 	tcpServer.Init()
 
 	err = tcpServer.Start("", "12000")
