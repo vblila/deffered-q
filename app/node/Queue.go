@@ -44,7 +44,7 @@ func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
 	return taskId, nil
 }
 
-func (q *Queue) Reserve() *Task {
+func (q *Queue) Reserve() (taskId string, taskBody []byte, stuckAttempts uint8, ok bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -63,12 +63,13 @@ func (q *Queue) Reserve() *Task {
 			q.reservedTasks.Put([]rune(task.Id), task)
 			q.tasks.Delete(node)
 
-			return task
+			return task.Id, task.Body, task.StuckAttempts, true
 		}
 		lastNode = node
 	}
 
-	return nil
+	ok = false
+	return
 }
 
 func (q *Queue) Return(taskId string, delayMs uint32, isStuckAttempt bool) bool {
