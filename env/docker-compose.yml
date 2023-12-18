@@ -7,7 +7,7 @@ services:
     ports:
       - "${DQ_TCP_HOST}:${DQ_TCP_PORT}:12000"
     volumes:
-      - ./logs/dq:/dq/logs
+      - ./logs/dq:/var/log/dq
     environment:
       - TZ=${TZ}
       - DQ_PROFILER_ENABLED=${DQ_PROFILER_ENABLED}
