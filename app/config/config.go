@@ -12,10 +12,15 @@ var ReservedTaskStuckTimeSec uint
 var ReservedTaskStuckMaxAttempts uint
 
 func init() {
-	ProfilerEnabled = readBoolEnv("DQ_PROFILER_ENABLED")
-	InactiveConnectionTimeSec = readUintEnv("DQ_INACTIVE_CONNECTION_TIME_SECONDS")
-	ReservedTaskStuckTimeSec = readUintEnv("DQ_RESERVED_TASK_STUCK_TIME_SECONDS")
-	ReservedTaskStuckMaxAttempts = readUintEnv("DQ_RESERVED_TASK_STUCK_MAX_ATTEMPTS")
+	//ProfilerEnabled = readBoolEnv("DQ_PROFILER_ENABLED")
+	//InactiveConnectionTimeSec = readUintEnv("DQ_INACTIVE_CONNECTION_TIME_SECONDS")
+	//ReservedTaskStuckTimeSec = readUintEnv("DQ_RESERVED_TASK_STUCK_TIME_SECONDS")
+	//ReservedTaskStuckMaxAttempts = readUintEnv("DQ_RESERVED_TASK_STUCK_MAX_ATTEMPTS")
+
+	ProfilerEnabled = false
+	InactiveConnectionTimeSec = 0
+	ReservedTaskStuckTimeSec = 3
+	ReservedTaskStuckMaxAttempts = 0
 }
 
 func readBoolEnv(envKey string) bool {

@@ -7,7 +7,11 @@ import (
 )
 
 type Watcher struct {
-	Queue *Queue
+	queue *Queue
+}
+
+func (w *Watcher) SetQueue(q *Queue) {
+	w.queue = q
 }
 
 func (w *Watcher) WatchFor(taskId string, stuckAttempts uint8) {
@@ -15,7 +19,7 @@ func (w *Watcher) WatchFor(taskId string, stuckAttempts uint8) {
 		time.Sleep(time.Second * time.Duration(config.ReservedTaskStuckTimeSec))
 
 		if stuckAttempts < uint8(config.ReservedTaskStuckMaxAttempts) {
-			returnResult := w.Queue.Return(taskId, uint32(config.ReservedTaskStuckTimeSec)*1000, true)
+			returnResult := w.queue.Return(taskId, uint32(config.ReservedTaskStuckTimeSec)*1000, true)
 
 			if config.ProfilerEnabled {
 				if returnResult {
@@ -25,7 +29,7 @@ func (w *Watcher) WatchFor(taskId string, stuckAttempts uint8) {
 				}
 			}
 		} else {
-			deleteResult := w.Queue.Delete(taskId)
+			deleteResult := w.queue.Delete(taskId)
 
 			if config.ProfilerEnabled {
 				if deleteResult {

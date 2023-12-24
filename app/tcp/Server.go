@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"dq/config"
 	"dq/node"
+	"dq/trie"
 	"dq/utils"
 	"fmt"
 	"io"
@@ -16,14 +17,22 @@ import (
 type Server struct {
 	mu          sync.Mutex
 	listener    net.Listener
-	Connections map[string]*Connection
-	Queue       *node.Queue
-	Parser      *Parser
-	Watcher     *node.Watcher
+	connections trie.Trie
+	queue       *node.Queue
+	parser      Parser
+	watcher     node.Watcher
 }
 
 func (s *Server) Init() {
-	s.Connections = make(map[string]*Connection)
+	s.connections = trie.Trie{}
+	s.parser = Parser{}
+
+	queue := &node.Queue{}
+
+	s.queue = queue
+
+	s.watcher = node.Watcher{}
+	s.watcher.SetQueue(queue)
 }
 
 func (s *Server) Start(host string, port string) error {
@@ -59,20 +68,24 @@ func (s *Server) addConnection(connection *Connection) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.Connections[connection.Id] = connection
+	s.connections.Put([]rune(connection.Id), connection)
 }
 
 func (s *Server) closeConnection(connectionId string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	connection, ok := s.Connections[connectionId]
-	if !ok {
+	key := []rune(connectionId)
+
+	value := s.connections.Get(key)
+	if value == nil {
 		return false
 	}
 
+	connection := value.(*Connection)
 	connection.NetConn.Close()
-	delete(s.Connections, connectionId)
+
+	s.connections.Delete(key)
 
 	return true
 }
@@ -81,7 +94,7 @@ func (s *Server) getConnectionsCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return len(s.Connections)
+	return int(s.connections.Length())
 }
 
 func (s *Server) handleConnection(c *Connection) {
@@ -114,99 +127,99 @@ func (s *Server) handleConnection(c *Connection) {
 			return
 		}
 
-		command, err := s.Parser.ParseCommand(lineBuffer)
+		command, err := s.parser.ParseCommand(lineBuffer)
 		if err != nil {
 			conn.Write([]byte(err.Error() + "\n"))
 			continue
 		}
 
 		if command == commandADD {
-			delayMs, err := s.Parser.ParseDelayMs(lineBuffer, 1)
+			delayMs, err := s.parser.ParseDelayMs(lineBuffer, 1)
 			if err != nil {
 				conn.Write([]byte(err.Error() + "\n"))
 				continue
 			}
 
-			taskBody, err := s.Parser.ParseTaskBody(lineBuffer, 2)
+			taskBody, err := s.parser.ParseTaskBody(lineBuffer, 2)
 			if err != nil {
 				conn.Write([]byte(err.Error() + "\n"))
 				continue
 			}
 
-			taskId, _ := s.Queue.Add(taskBody, delayMs)
+			taskId, _ := s.queue.Add(taskBody, delayMs)
 			conn.Write([]byte(fmt.Sprintf("TASK %s DELAY %dms\n", taskId, delayMs)))
 
 			if config.ProfilerEnabled {
-				log.Printf("New task, tasks %d, heap %.2fmb\n", s.Queue.TasksLength(), utils.HeapAllocMb())
+				log.Printf("New task, tasks %d, heap %.2fmb\n", s.queue.TasksLength(), utils.HeapAllocMb())
 			}
 
 			continue
 		}
 
 		if command == commandRESERVE {
-			taskId, taskBody, stuckAttempts, ok := s.Queue.Reserve()
+			taskId, taskBody, stuckAttempts, ok := s.queue.Reserve()
 			if ok == false {
 				conn.Write([]byte("nil\n"))
 				continue
 			}
 
 			if config.ReservedTaskStuckTimeSec > 0 {
-				s.Watcher.WatchFor(taskId, stuckAttempts)
+				s.watcher.WatchFor(taskId, stuckAttempts)
 			}
 
 			conn.Write([]byte(fmt.Sprintf("TASK %s BODY %s\n", taskId, taskBody)))
 			if config.ProfilerEnabled {
-				log.Printf("Task reserved, tasks %d, reserved %d, heap %.2fmb\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), utils.HeapAllocMb())
+				log.Printf("Task reserved, tasks %d, reserved %d, heap %.2fmb\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), utils.HeapAllocMb())
 			}
 			continue
 		}
 
 		if command == commandDELETE {
-			taskId, err := s.Parser.ParseTaskId(lineBuffer, 1)
+			taskId, err := s.parser.ParseTaskId(lineBuffer, 1)
 			if err != nil {
 				conn.Write([]byte(err.Error() + "\n"))
 				continue
 			}
 
-			if !s.Queue.Delete(taskId) {
+			if !s.queue.Delete(taskId) {
 				conn.Write([]byte("unknown TASK_ID\n"))
 				continue
 			}
 
 			conn.Write([]byte(fmt.Sprintf("ok\n")))
 			if config.ProfilerEnabled {
-				log.Printf("Task deleted, tasks %d, reserved %d, heap %.2fmb\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), utils.HeapAllocMb())
+				log.Printf("Task deleted, tasks %d, reserved %d, heap %.2fmb\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), utils.HeapAllocMb())
 			}
 			continue
 		}
 
 		if command == commandRETURN {
-			taskId, err := s.Parser.ParseTaskId(lineBuffer, 1)
+			taskId, err := s.parser.ParseTaskId(lineBuffer, 1)
 			if err != nil {
 				conn.Write([]byte(err.Error() + "\n"))
 				continue
 			}
 
-			delayMs, err := s.Parser.ParseDelayMs(lineBuffer, 2)
+			delayMs, err := s.parser.ParseDelayMs(lineBuffer, 2)
 			if err != nil {
 				conn.Write([]byte(err.Error() + "\n"))
 				continue
 			}
 
-			if !s.Queue.Return(taskId, delayMs, false) {
+			if !s.queue.Return(taskId, delayMs, false) {
 				conn.Write([]byte("unknown TASK_ID\n"))
 				continue
 			}
 
 			conn.Write([]byte(fmt.Sprintf("ok\n")))
 			if config.ProfilerEnabled {
-				log.Printf("Task returned, tasks %d, reserved %d, heap %.2fmb\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), utils.HeapAllocMb())
+				log.Printf("Task returned, tasks %d, reserved %d, heap %.2fmb\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), utils.HeapAllocMb())
 			}
 			continue
 		}
 
 		if command == commandSTATS {
-			conn.Write([]byte(fmt.Sprintf("TASKS %d RESERVED %d CONNECTIONS %d HEAP %.2fm\n", s.Queue.TasksLength(), s.Queue.ReservedTasksLength(), s.getConnectionsCount(), utils.HeapAllocMb())))
+			conn.Write([]byte(fmt.Sprintf("TASKS %d RESERVED %d CONNECTIONS %d HEAP %.2fm\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), s.getConnectionsCount(), utils.HeapAllocMb())))
 			continue
 		}
 

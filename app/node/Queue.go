@@ -13,13 +13,13 @@ const taskIdLength = 8
 
 type Queue struct {
 	mu            sync.Mutex
-	tasks         *linkedlist.List
-	reservedTasks *trie.Trie
+	tasks         linkedlist.List
+	reservedTasks trie.Trie
 }
 
 func (q *Queue) Init() {
-	q.tasks = &linkedlist.List{}
-	q.reservedTasks = &trie.Trie{}
+	q.tasks = linkedlist.List{}
+	q.reservedTasks = trie.Trie{}
 }
 
 func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
@@ -35,9 +35,6 @@ func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
 	}
 
 	q.mu.Lock()
-	if q.tasks == nil {
-		q.tasks = &linkedlist.List{}
-	}
 	q.tasks.Push(&Task{Id: taskId, Body: taskBody, DelayedTime: delayedTime})
 	defer q.mu.Unlock()
 

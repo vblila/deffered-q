@@ -1,18 +1,12 @@
 package main
 
 import (
-	"dq/node"
 	"dq/tcp"
 	"log"
 )
 
 func main() {
-	// 1. Queue init
-	queue := &node.Queue{}
-	queue.Init()
-
-	// 2. TCP Server init
-	tcpServer := &tcp.Server{Parser: &tcp.Parser{}, Queue: queue, Watcher: &node.Watcher{Queue: queue}}
+	tcpServer := tcp.Server{}
 	tcpServer.Init()
 
 	err := tcpServer.Start("", "12000")
