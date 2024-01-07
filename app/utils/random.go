@@ -2,21 +2,27 @@ package utils
 
 import (
 	"crypto/rand"
-	"math/big"
+	"math"
 )
 
-func RandomString(n int) (string, error) {
-	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-	lettersLength := int64(len(letters))
+const randomIdLength = 10
+const randomIdAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-	ret := make([]byte, n)
-	for i := 0; i < n; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(lettersLength))
-		if err != nil {
-			return "", err
-		}
-		ret[i] = letters[num.Int64()]
+func RandomId() string {
+	buf := make([]byte, randomIdLength)
+	_, err := rand.Read(buf)
+	if err != nil {
+		panic(err)
 	}
 
-	return string(ret), nil
+	k := 255.0 / float64(len(randomIdAlphabet)-1)
+
+	randomId := make([]byte, randomIdLength)
+
+	for i := 0; i < randomIdLength; i++ {
+		key := int(math.Round(float64(buf[i]) / k))
+		randomId[i] = randomIdAlphabet[key]
+	}
+
+	return string(randomId)
 }

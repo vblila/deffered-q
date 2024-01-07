@@ -4,12 +4,9 @@ import (
 	"dq/linkedlist"
 	"dq/trie"
 	"dq/utils"
-	"log"
 	"sync"
 	"time"
 )
-
-const taskIdLength = 8
 
 type Queue struct {
 	mu            sync.Mutex
@@ -23,11 +20,7 @@ func (q *Queue) Init() {
 }
 
 func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
-	taskId, err := utils.RandomString(taskIdLength)
-	if err != nil {
-		log.Println("Task id generation failed", err.Error())
-		return "", err
-	}
+	taskId := utils.RandomId()
 
 	delayedTime := time.Now()
 	if delayMs > 0 {

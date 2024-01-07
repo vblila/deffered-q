@@ -53,13 +53,7 @@ func (s *Server) Listen() {
 			continue
 		}
 
-		connectionId, err := utils.RandomString(8)
-		if err != nil {
-			log.Println("Connection id generation failed", err.Error())
-			continue
-		}
-
-		connection := &Connection{NetConn: conn, Start: time.Now(), Id: connectionId}
+		connection := &Connection{NetConn: conn, Start: time.Now(), Id: utils.RandomId()}
 		go s.handleConnection(connection)
 	}
 }
