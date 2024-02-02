@@ -3,8 +3,7 @@ package tcp
 import (
 	"bufio"
 	"dq/config"
-	"dq/node"
-	"dq/trie"
+	"dq/queue"
 	"dq/utils"
 	"fmt"
 	"io"
@@ -17,22 +16,23 @@ import (
 type Server struct {
 	mu          sync.Mutex
 	listener    net.Listener
-	connections trie.Trie
-	queue       *node.Queue
+	connections map[string]*Connection
+	q           *queue.Queue
 	parser      Parser
-	watcher     node.Watcher
+	watcher     queue.Watcher
 }
 
 func (s *Server) Init() {
-	s.connections = trie.Trie{}
+	s.connections = make(map[string]*Connection, 128)
 	s.parser = Parser{}
 
-	queue := &node.Queue{}
+	q := &queue.Queue{}
+	q.Init()
 
-	s.queue = queue
+	s.q = q
 
-	s.watcher = node.Watcher{}
-	s.watcher.SetQueue(queue)
+	s.watcher = queue.Watcher{}
+	s.watcher.SetQueue(q)
 }
 
 func (s *Server) Start(host string, port string) error {
@@ -62,24 +62,20 @@ func (s *Server) addConnection(connection *Connection) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.connections.Put([]rune(connection.Id), connection)
+	s.connections[connection.Id] = connection
 }
 
 func (s *Server) closeConnection(connectionId string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	key := []rune(connectionId)
-
-	value := s.connections.Get(key)
-	if value == nil {
+	connection, ok := s.connections[connectionId]
+	if !ok {
 		return false
 	}
 
-	connection := value.(*Connection)
 	connection.NetConn.Close()
-
-	s.connections.Delete(key)
+	delete(s.connections, connectionId)
 
 	return true
 }
@@ -88,7 +84,7 @@ func (s *Server) getConnectionsCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return int(s.connections.Length())
+	return len(s.connections)
 }
 
 func (s *Server) handleConnection(c *Connection) {
@@ -140,18 +136,18 @@ func (s *Server) handleConnection(c *Connection) {
 				continue
 			}
 
-			taskId, _ := s.queue.Add(taskBody, delayMs)
+			taskId, _ := s.q.Add(taskBody, delayMs)
 			conn.Write([]byte(fmt.Sprintf("TASK %s DELAY %dms\n", taskId, delayMs)))
 
 			if config.ProfilerEnabled {
-				log.Printf("New task, tasks %d, heap %.2fmb\n", s.queue.TasksLength(), utils.HeapAllocMb())
+				log.Printf("New task, tasks %d, heap %.2fmb\n", s.q.TasksLength(), utils.HeapAllocMb())
 			}
 
 			continue
 		}
 
 		if command == commandRESERVE {
-			taskId, taskBody, stuckAttempts, ok := s.queue.Reserve()
+			taskId, taskBody, stuckAttempts, ok := s.q.Reserve()
 			if ok == false {
 				conn.Write([]byte("nil\n"))
 				continue
@@ -163,7 +159,7 @@ func (s *Server) handleConnection(c *Connection) {
 
 			conn.Write([]byte(fmt.Sprintf("TASK %s BODY %s\n", taskId, taskBody)))
 			if config.ProfilerEnabled {
-				log.Printf("Task reserved, tasks %d, reserved %d, heap %.2fmb\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), utils.HeapAllocMb())
+				log.Printf("Value reserved, tasks %d, reserved %d, heap %.2fmb\n", s.q.TasksLength(), s.q.ReservedTasksLength(), utils.HeapAllocMb())
 			}
 			continue
 		}
@@ -175,14 +171,14 @@ func (s *Server) handleConnection(c *Connection) {
 				continue
 			}
 
-			if !s.queue.Delete(taskId) {
+			if !s.q.Delete(taskId) {
 				conn.Write([]byte("unknown TASK_ID\n"))
 				continue
 			}
 
 			conn.Write([]byte(fmt.Sprintf("ok\n")))
 			if config.ProfilerEnabled {
-				log.Printf("Task deleted, tasks %d, reserved %d, heap %.2fmb\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), utils.HeapAllocMb())
+				log.Printf("Value deleted, tasks %d, reserved %d, heap %.2fmb\n", s.q.TasksLength(), s.q.ReservedTasksLength(), utils.HeapAllocMb())
 			}
 			continue
 		}
@@ -200,20 +196,20 @@ func (s *Server) handleConnection(c *Connection) {
 				continue
 			}
 
-			if !s.queue.Return(taskId, delayMs, false) {
+			if !s.q.Return(taskId, delayMs, false) {
 				conn.Write([]byte("unknown TASK_ID\n"))
 				continue
 			}
 
 			conn.Write([]byte(fmt.Sprintf("ok\n")))
 			if config.ProfilerEnabled {
-				log.Printf("Task returned, tasks %d, reserved %d, heap %.2fmb\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), utils.HeapAllocMb())
+				log.Printf("Value returned, tasks %d, reserved %d, heap %.2fmb\n", s.q.TasksLength(), s.q.ReservedTasksLength(), utils.HeapAllocMb())
 			}
 			continue
 		}
 
 		if command == commandSTATS {
-			conn.Write([]byte(fmt.Sprintf("TASKS %d RESERVED %d CONNECTIONS %d HEAP %.2fm\n", s.queue.TasksLength(), s.queue.ReservedTasksLength(), s.getConnectionsCount(), utils.HeapAllocMb())))
+			conn.Write([]byte(fmt.Sprintf("TASKS %d RESERVED %d CONNECTIONS %d HEAP %.2fm\n", s.q.TasksLength(), s.q.ReservedTasksLength(), s.getConnectionsCount(), utils.HeapAllocMb())))
 			continue
 		}
 

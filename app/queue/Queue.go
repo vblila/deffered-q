@@ -1,8 +1,6 @@
-package node
+package queue
 
 import (
-	"dq/linkedlist"
-	"dq/trie"
 	"dq/utils"
 	"sync"
 	"time"
@@ -10,13 +8,13 @@ import (
 
 type Queue struct {
 	mu            sync.Mutex
-	tasks         linkedlist.List
-	reservedTasks trie.Trie
+	tasks         linkedList
+	reservedTasks map[string]*Task
 }
 
 func (q *Queue) Init() {
-	q.tasks = linkedlist.List{}
-	q.reservedTasks = trie.Trie{}
+	q.tasks = linkedList{}
+	q.reservedTasks = make(map[string]*Task, 1024)
 }
 
 func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
@@ -38,7 +36,7 @@ func (q *Queue) Reserve() (taskId string, taskBody []byte, stuckAttempts uint8, 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	var lastNode *linkedlist.Node
+	var lastNode *linkedListNode
 
 	for {
 		// FIFO очередь тасков
@@ -47,10 +45,10 @@ func (q *Queue) Reserve() (taskId string, taskBody []byte, stuckAttempts uint8, 
 			break
 		}
 
-		task := node.Value.(*Task)
+		task := node.Value
 
 		if task.DelayedTime.Before(time.Now()) {
-			q.reservedTasks.Put([]rune(task.Id), task)
+			q.reservedTasks[task.Id] = task
 			q.tasks.Delete(node)
 
 			return task.Id, task.Body, task.StuckAttempts, true
@@ -66,12 +64,10 @@ func (q *Queue) Return(taskId string, delayMs uint32, isStuckAttempt bool) bool 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	rawValue := q.reservedTasks.Get([]rune(taskId))
-	if rawValue == nil {
+	task, ok := q.reservedTasks[taskId]
+	if !ok {
 		return false
 	}
-
-	task := rawValue.(*Task)
 
 	task.DelayedTime = time.Now()
 	if delayMs > 0 {
@@ -84,7 +80,7 @@ func (q *Queue) Return(taskId string, delayMs uint32, isStuckAttempt bool) bool 
 
 	q.tasks.Push(task)
 
-	q.reservedTasks.Delete([]rune(task.Id))
+	delete(q.reservedTasks, task.Id)
 
 	return true
 }
@@ -93,7 +89,12 @@ func (q *Queue) Delete(taskId string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	return q.reservedTasks.Delete([]rune(taskId))
+	_, ok := q.reservedTasks[taskId]
+	if ok {
+		delete(q.reservedTasks, taskId)
+	}
+
+	return ok
 }
 
 func (q *Queue) TasksLength() int {
@@ -107,5 +108,5 @@ func (q *Queue) ReservedTasksLength() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	return int(q.reservedTasks.Length())
+	return len(q.reservedTasks)
 }

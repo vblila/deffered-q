@@ -1,17 +1,23 @@
-package linkedlist
+package queue
 
-type List struct {
-	head   *Node
-	tail   *Node
+type linkedListNode struct {
+	prev  *linkedListNode
+	next  *linkedListNode
+	Value *Task
+}
+
+type linkedList struct {
+	head   *linkedListNode
+	tail   *linkedListNode
 	length uint32
 }
 
-func (l *List) Length() uint32 {
+func (l *linkedList) Length() uint32 {
 	return l.length
 }
 
-func (l *List) Push(value interface{}) {
-	node := &Node{prev: nil, next: nil, Value: value}
+func (l *linkedList) Push(value *Task) {
+	node := &linkedListNode{prev: nil, next: nil, Value: value}
 	if l.tail == nil {
 		l.tail = node
 		l.head = node
@@ -24,7 +30,7 @@ func (l *List) Push(value interface{}) {
 	l.length++
 }
 
-func (l *List) Next(curr *Node) *Node {
+func (l *linkedList) Next(curr *linkedListNode) *linkedListNode {
 	if curr != nil {
 		return curr.next
 	} else {
@@ -32,7 +38,7 @@ func (l *List) Next(curr *Node) *Node {
 	}
 }
 
-func (l *List) Delete(node *Node) {
+func (l *linkedList) Delete(node *linkedListNode) {
 	if node == l.head {
 		l.head = node.next
 	}
