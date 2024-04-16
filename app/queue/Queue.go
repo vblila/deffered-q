@@ -27,7 +27,7 @@ func (q *Queue) Add(taskBody []byte, delayMs uint32) (string, error) {
 
 	q.mu.Lock()
 	q.tasks.Push(&Task{Id: taskId, Body: taskBody, DelayedTime: delayedTime})
-	defer q.mu.Unlock()
+	q.mu.Unlock()
 
 	return taskId, nil
 }
@@ -87,26 +87,28 @@ func (q *Queue) Return(taskId string, delayMs uint32, isStuckAttempt bool) bool 
 
 func (q *Queue) Delete(taskId string) bool {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 
 	_, ok := q.reservedTasks[taskId]
 	if ok {
 		delete(q.reservedTasks, taskId)
 	}
 
+	q.mu.Unlock()
 	return ok
 }
 
 func (q *Queue) TasksLength() int {
 	q.mu.Lock()
-	defer q.mu.Unlock()
+	tasks := int(q.tasks.Length())
+	q.mu.Unlock()
 
-	return int(q.tasks.Length())
+	return tasks
 }
 
 func (q *Queue) ReservedTasksLength() int {
 	q.mu.Lock()
-	defer q.mu.Unlock()
+	reservedTasks := len(q.reservedTasks)
+	q.mu.Unlock()
 
-	return len(q.reservedTasks)
+	return reservedTasks
 }

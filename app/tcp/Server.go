@@ -60,9 +60,8 @@ func (s *Server) Listen() {
 
 func (s *Server) addConnection(connection *Connection) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	s.connections[connection.Id] = connection
+	s.mu.Unlock()
 }
 
 func (s *Server) closeConnection(connectionId string) bool {
@@ -82,9 +81,10 @@ func (s *Server) closeConnection(connectionId string) bool {
 
 func (s *Server) getConnectionsCount() int {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	connections := len(s.connections)
+	s.mu.Unlock()
 
-	return len(s.connections)
+	return connections
 }
 
 func (s *Server) handleConnection(c *Connection) {

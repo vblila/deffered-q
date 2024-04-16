@@ -52,29 +52,35 @@ DefferedQ has the simplest protocol over TCP using UTF-8 encoding, so you can us
 ```console
 pc:~$ nc 172.17.0.1 12000
 STATS
-TASKS 0 RESERVED 0 CONNECTIONS 1 HEAP 0.24m
+TASKS 0 RESERVED 0 CONNECTIONS 1 HEAP 0.23m
 ADD 1000 task_1
-TASK yqBHNfdgYb DELAY 1000ms
-ADD 1000 tast_2
-TASK 3TGlYzw4OI DELAY 1000ms
-STATS
+TASK OltvoUgZdM DELAY 1000ms
+ADD 2000 tast_2
+TASK HNg5yBOmYu DELAY 2000ms
+STATS  
 TASKS 2 RESERVED 0 CONNECTIONS 1 HEAP 0.25m
-RESERVE 
-TASK yqBHNfdgYb BODY task_1
 RESERVE
-TASK 3TGlYzw4OI BODY tast_2
+TASK OltvoUgZdM BODY task_1
+RESERVE
+TASK HNg5yBOmYu BODY tast_2
 RESERVE
 nil
 STATS
-TASKS 0 RESERVED 2 CONNECTIONS 1 HEAP 0.27m
-DELETE 3TGlYzw4OI
+TASKS 0 RESERVED 2 CONNECTIONS 1 HEAP 0.26m
+DELETE HNg5yBOmYu
 ok
 STATS
 TASKS 0 RESERVED 1 CONNECTIONS 1 HEAP 0.27m
-DELETE yqBHNfdgYb
+RETURN OltvoUgZdM 3000
 ok
 STATS
-TASKS 0 RESERVED 0 CONNECTIONS 1 HEAP 0.28m
+TASKS 1 RESERVED 0 CONNECTIONS 1 HEAP 0.28m
+RESERVE
+TASK OltvoUgZdM BODY task_1
+DELETE OltvoUgZdM
+ok
+STATS
+TASKS 0 RESERVED 0 CONNECTIONS 1 HEAP 0.29m
 ```
 
 # Task lifecycle #
@@ -146,7 +152,8 @@ Usage of ./deffered-q:
     	Reserved task life time (in seconds) after which the watcher will delete the reserved task or add it back to the queue, 0 - disable watcher
 ```
 
-If you want to use built-in docker, see how to start the server in the Dockerfile with environment parameters:
+If you want to use built-in docker, see how the server starts with environment parameters in the Dockerfile:
+
 ```dockerfile
 ENTRYPOINT /dq/dq \
     -h "" \
