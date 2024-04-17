@@ -2,32 +2,34 @@
 DefferedQ is a simple and fast work queue.
 
 # Protocol #
-Protocol runs over TCP using UTF-8 encoding.
+Protocol runs over TCP using UTF-8 encoding (inspired by the Beanstalkd and Memcached).
 
 ## Interface ##
 General command structure:
 
 ```
-<ATTR_0> <ATTR_1> <ATTR_2> ... <ATTR_N>\n
+<ATTR_0> <ATTR_1> <ATTR_2> ... <ATTR_N>\r\n
 ```
 
 where ATTR_0 is a command, ATTR_1, ..., ATTR_N are command parameters.
 
 ## Commands ##
 
-1. Add task to queue
+1. Add task to the queue
 
 ```
 ADD <DELAY_MS> <TASK_BODY>
 ```
 
-2. Get and reserve next task from queue
+**TASK_BODY must have no spaces or line breaks**. It's better to encode the task body in base64.
+
+2. Get and reserve next task from the queue
 
 ```
 RESERVE
 ``` 
 
-3. Delete reserved task
+3. Delete reserved task (it's possible to delete only reserved tasks)
 
 ```
 DELETE <TASK_ID>
@@ -39,7 +41,7 @@ DELETE <TASK_ID>
 RETURN <TASK_ID> <DELAY_MS>
 ``` 
 
-5. Show statistic of service
+5. Show service statistics 
 
 ```
 STATS
@@ -47,7 +49,7 @@ STATS
 
 ## Usage example ##
 
-DefferedQ has the simplest protocol over TCP using UTF-8 encoding, so you can use netcat to work with the server.
+DefferedQ has the simplest protocol over TCP using UTF-8 encoding, so you can use netcat as CLI to work with the server:
 
 ```console
 pc:~$ nc 172.17.0.1 12000
@@ -55,14 +57,14 @@ STATS
 TASKS 0 RESERVED 0 CONNECTIONS 1 HEAP 0.23m
 ADD 1000 task_1
 TASK OltvoUgZdM DELAY 1000ms
-ADD 2000 tast_2
+ADD 2000 task_2
 TASK HNg5yBOmYu DELAY 2000ms
 STATS  
 TASKS 2 RESERVED 0 CONNECTIONS 1 HEAP 0.25m
 RESERVE
 TASK OltvoUgZdM BODY task_1
 RESERVE
-TASK HNg5yBOmYu BODY tast_2
+TASK HNg5yBOmYu BODY task_2
 RESERVE
 nil
 STATS
