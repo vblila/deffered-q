@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker-compose -p 'dq' up -d --no-deps --build
+docker compose -p 'dq' up -d --no-deps --build
